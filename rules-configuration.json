@@ -67,10 +67,6 @@
                 "type": "string",
                 "selector": "img",
                 "attribute": "src"
-            },
-            "image.caption": {
-                "type": "element",
-                "selector": "img"
             }
         }
     },{
@@ -81,20 +77,6 @@
                 "type": "string",
                 "selector": "img",
                 "attribute": "src"
-            },
-            "image.caption": {
-                "type": "element",
-                "selector": "img[@alt]"
-            }
-        }
-    }, {
-        "class": "CaptionRule",
-        "selector": "img",
-        "properties": {
-            "caption.default": {
-                "type": "string",
-                "selector": "img",
-                "attribute": "alt"
             }
         }
     }, {
@@ -187,6 +169,15 @@
             "interactive.iframe" : {
                 "type" : "children",
                 "selector" : "div.interactive"
+            },
+            "interactive.height" : {
+                "type" : "int",
+                "selector" : "iframe",
+                "attribute": "height"
+            },
+            "interactive.iframe" : {
+                "type" : "children",
+                "selector" : "iframe"
             }
         }
     }, {
@@ -217,10 +208,6 @@
                 "type": "string",
                 "selector": "img",
                 "attribute": "src"
-            },
-            "image.caption": {
-                "type": "element",
-                "selector": "img[@alt]"
             }
         }
     }, {

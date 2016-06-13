@@ -15,7 +15,7 @@ use Facebook\InstantArticles\Client\ServerMessage;
 <p>
 	<b>
 		<span class="dashicons dashicons-media-document"></span>
-		Your post will be submitted to Instant Articles once you publish it.
+		Your post will be submitted to Instant Articles once it is published.
 	</b>
 </p>
 
@@ -139,9 +139,9 @@ use Facebook\InstantArticles\Client\ServerMessage;
 	<p>
 		<span class="dashicons dashicons-warning"></span>
 		This post was transformed into an Instant Article with some warnings
-		<a href="#" class="instant-articles-toggle-debug">
-			(toggle debug information)
-		</a>
+		[<a href="https://wordpress.org/plugins/fb-instant-articles/faq/" target="_blank">Learn more</a> |
+		<a href="<?php echo esc_url( $settings_page_href ); ?>">Transformer rule configuration</a> |
+		<a href="#" class="instant-articles-toggle-debug">Toggle debug information</a>]
 	</p>
 	<ul class="instant-articles-messages">
 		<?php foreach ( $adapter->transformer->getWarnings() as $warning ) : ?>
@@ -151,9 +151,11 @@ use Facebook\InstantArticles\Client\ServerMessage;
 					<?php echo esc_html( $warning ); ?>
 					<span>
 						<?php
-							echo esc_html(
-								$warning->getNode()->ownerDocument->saveHTML( $warning->getNode() )
-							);
+							if ( $warning->getNode() ) {
+								echo esc_html(
+									$warning->getNode()->ownerDocument->saveHTML( $warning->getNode() )
+								);
+							}
 						?>
 					</span>
 				</div>
@@ -166,9 +168,7 @@ use Facebook\InstantArticles\Client\ServerMessage;
 	<p>
 		<span class="dashicons dashicons-yes"></span>
 		This post was transformed into an Instant Article with no warnings
-		<a href="#" class="instant-articles-toggle-debug">
-			(toggle debug information)
-		</a>
+		[<a href="#" class="instant-articles-toggle-debug">Toggle debug information]</a>
 	</p>
 <?php endif; ?>
 
