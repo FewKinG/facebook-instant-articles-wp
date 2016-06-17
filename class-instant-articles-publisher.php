@@ -42,6 +42,11 @@ class Instant_Articles_Publisher {
 			return;
 		}
 
+		$publish = apply_filters( 'instant_article_publish_post', $post );
+                if ( $publish === false ) {
+                        return;
+                }
+
 		// Transform the post to an Instant Article.
 		$adapter = new Instant_Articles_Post( $post );
 

@@ -645,6 +645,7 @@ class Instant_Articles_Post {
 		$cover = $this->get_the_featured_image();
 		if ( $cover['src'] ) {
 			$image = Image::create()->withURL( $cover['src'] );
+			//$image->withPresentation ( Image::FULLSCREEN ) ;
 			if ( isset( $cover['caption'] ) && strlen( $cover['caption'] ) > 0 ) {
 				$document = DOMDocument::loadHTML( '<?xml encoding="' . $blog_charset . '" ?><h1>' . $cover['caption']  . '</h1>' );
 				$image->withCaption( $transformer->transform( Caption::create(), $document ) );
