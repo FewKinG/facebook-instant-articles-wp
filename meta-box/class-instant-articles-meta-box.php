@@ -28,6 +28,10 @@ class Instant_Articles_Meta_Box {
 			'wp_ajax_instant_articles_meta_box',
 			array( 'Instant_Articles_Meta_Box', 'render_meta_box' )
 		);
+		add_action(
+			'wp_ajax_instant_articles_force_submit',
+			array( 'Instant_Articles_Meta_Box', 'force_submit' )
+		);
 	}
 
 	/**
@@ -38,7 +42,9 @@ class Instant_Articles_Meta_Box {
 			'instant_article_meta_box',
 			'Facebook Instant Articles',
 			array( 'Instant_Articles_Meta_Box', 'render_meta_box_loader' ),
-			'post',
+
+			/** This filter is defined in facebook-instant-articles.php. */
+			apply_filters( 'instant_articles_post_types', array( 'post' ) ),
 			'normal',
 			'default'
 		);
@@ -56,39 +62,69 @@ class Instant_Articles_Meta_Box {
 	/**
 	 * Renderer for the Metabox.
 	 */
+	public static function force_submit() {
+		check_ajax_referer( 'instant-articles-force-submit', 'security' );
+		$post_id = intval( $_POST[ 'post_ID' ] );
+		$force = sanitize_text_field( $_POST[ 'force' ] ) === 'true';
+		update_post_meta( $post_id, Instant_Articles_Publisher::FORCE_SUBMIT_KEY, $force );
+		Instant_Articles_Publisher::submit_article( $post_id, get_post( $post_id ) );
+	}
+
+	/**
+	 * Renderer for the Metabox.
+	 */
 	public static function render_meta_box() {
-		$post = get_post( intval( filter_input( INPUT_POST, 'post_ID' ) ) );
+		$ajax_nonce = wp_create_nonce( "instant-articles-force-submit" );
+		$post_id = intval( $_POST[ 'post_ID' ] );
+		$post = get_post( $post_id );
 		$adapter = new Instant_Articles_Post( $post );
 		$article = $adapter->to_instant_article();
 		$canonical_url = $adapter->get_canonical_url();
 		$submission_status = null;
 		$published = 'publish' === $post->post_status;
+		$dev_mode = false;
+		$force_submit = get_post_meta( $post_id, Instant_Articles_Publisher::FORCE_SUBMIT_KEY, true );
 
-		Instant_Articles_Settings::menu_items();
-		$settings_page_href = Instant_Articles_Settings::get_href_to_settings_page();
+		Instant_Articles_Wizard::menu_items();
+		$settings_page_href = Instant_Articles_Wizard::get_url();
 
-		try {
-			$fb_app_settings = Instant_Articles_Option_FB_App::get_option_decoded();
-			$fb_page_settings = Instant_Articles_Option_FB_Page::get_option_decoded();
+		$publishing_settings = Instant_Articles_Option_Publishing::get_option_decoded();
+		$publish_with_warnings = $publishing_settings[ 'publish_with_warnings' ];
+		if ( $published ) {
+			try {
+				$fb_app_settings = Instant_Articles_Option_FB_App::get_option_decoded();
+				$fb_page_settings = Instant_Articles_Option_FB_Page::get_option_decoded();
+				$publishing_settings = Instant_Articles_Option_Publishing::get_option_decoded();
 
-			if ( isset( $fb_app_settings['app_id'] )
-				&& isset( $fb_app_settings['app_secret'] )
-				&& isset( $fb_page_settings['page_access_token'] )
-				&& isset( $fb_page_settings['page_id'] ) ) {
-				// Instantiate a new Client to get the status of this article.
-				$client = Client::create(
-					$fb_app_settings['app_id'],
-					$fb_app_settings['app_secret'],
-					$fb_page_settings['page_access_token'],
-					$fb_page_settings['page_id']
-				);
+				$dev_mode = isset( $publishing_settings['dev_mode'] )
+					? ( $publishing_settings['dev_mode'] ? true : false )
+					: false;
 
-				// Grab the latest status of this article and display.
-				$article_id = $client->getArticleIDFromCanonicalURL( $canonical_url );
-				$submission_status = $client->getLastSubmissionStatus( $article_id );
+				if ( isset( $fb_app_settings['app_id'] )
+					&& isset( $fb_app_settings['app_secret'] )
+					&& isset( $fb_page_settings['page_access_token'] )
+					&& isset( $fb_page_settings['page_id'] ) ) {
+					// Instantiate a new Client to get the status of this article.
+					$client = Client::create(
+						$fb_app_settings['app_id'],
+						$fb_app_settings['app_secret'],
+						$fb_page_settings['page_access_token'],
+						$fb_page_settings['page_id'],
+						$dev_mode
+					);
+
+					$submission_status_id = get_post_meta( $post_id, Instant_Articles_Publisher::SUBMISSION_ID_KEY, true );
+					if ( ! empty( $submission_status_id ) ) {
+						$submission_status = $client->getSubmissionStatus( $submission_status_id );
+					} else {
+						// Grab the latest status of this article and display.
+						$article_id = $client->getArticleIDFromCanonicalURL( $canonical_url );
+						$submission_status = $client->getLastSubmissionStatus( $article_id );
+					}
+				}
+			} catch ( FacebookResponseException $e ) {
+				$submission_status = null;
 			}
-		} catch ( FacebookResponseException $e ) {
-			$submission_status = null;
 		}
 
 		include( dirname( __FILE__ ) . '/meta-box-template.php' );

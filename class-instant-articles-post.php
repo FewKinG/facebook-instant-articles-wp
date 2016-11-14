@@ -14,6 +14,7 @@ use Facebook\InstantArticles\Elements\Ad;
 use Facebook\InstantArticles\Elements\Analytics;
 use Facebook\InstantArticles\Elements\Author;
 use Facebook\InstantArticles\Elements\Image;
+use Facebook\InstantArticles\Elements\Video;
 use Facebook\InstantArticles\Elements\Caption;
 use Facebook\InstantArticles\Elements\Footer;
 use Facebook\InstantArticles\Transformer\Transformer;
@@ -83,6 +84,15 @@ class Instant_Articles_Post {
 	 */
 	public function get_the_title() {
 		$title = $this->_post->post_title;
+
+		/**
+		 * Apply the default filter 'the_title' for the post title.
+		 *
+		 * @since 3.1
+		 * @param string  $title  The current post title.
+		 * @param int     $id     The current post ID.
+		 */
+		$title = apply_filters( 'the_title', $title, $this->_post->ID );
 
 		/**
 		 * Filter the post title for use in instant articles.
@@ -244,12 +254,12 @@ class Instant_Articles_Post {
 		// If post is draft, clone it to get the eventual permalink,
 		// see http://wordpress.stackexchange.com/a/42988.
 		if ( in_array( $this->_post->post_status, array( 'draft', 'pending', 'auto-draft' ), true ) ) {
-		    $post_clone = clone $this->_post;
-		    $post_clone->post_status = 'published';
-		    $post_clone->post_name = sanitize_title( $post_clone->post_name ? $post_clone->post_name : $post_clone->post_title, $post_clone->ID );
-		    $url = get_permalink( $post_clone );
+			$post_clone = clone $this->_post;
+			$post_clone->post_status = 'published';
+			$post_clone->post_name = sanitize_title( $post_clone->post_name ? $post_clone->post_name : $post_clone->post_title, $post_clone->ID );
+			$url = get_permalink( $post_clone );
 		} else {
-		    $url = get_permalink( $this->_post );
+			$url = get_permalink( $this->_post );
 		}
 
 		return $url;
@@ -296,7 +306,7 @@ class Instant_Articles_Post {
 
 		// If we’re not it the loop or otherwise properly setup.
 		$reset_postdata = false;
-		if ( $this->_post->ID !== $post->ID ) {
+		if ( empty( $post ) || $this->_post->ID !== $post->ID ) {
 			$post = get_post( $this->_post->ID );
 			setup_postdata( $post );
 			$reset_postdata = true;
@@ -311,6 +321,11 @@ class Instant_Articles_Post {
 		 * @since 0.1
 		 * @param string  $content  The current post content.
 		 */
+
+		// Some people choose to disable wpautop. Due to the Instant Articles spec, we really want it in!
+		if ( ! has_filter( 'the_content', 'wpautop' ) )
+			add_filter( 'the_content', 'wpautop' );
+
 		$content = apply_filters( 'the_content', $content );
 
 		// Maybe cleanup some globals after us?
@@ -319,8 +334,11 @@ class Instant_Articles_Post {
 			wp_reset_postdata();
 		}
 
-		// Some people choose to disable wpautop. Due to the Instant Articles spec, we really want it in!
-		$content = wpautop( $content );
+		// Remove hyperlinks beginning with a # as they cause errors on Facebook (from http://wordpress.stackexchange.com/a/227332/19528)
+		preg_match_all( '!<a[^>]*? href=[\'"]#[^<]+</a>!i', $content, $matches );
+		foreach ( $matches[0] as $link ) {
+			$content = str_replace( $link, strip_tags($link), $content );
+		}
 
 		/**
 		 * Filter the post content for Instant Articles.
@@ -475,12 +493,12 @@ class Instant_Articles_Post {
 	 * Get the cover media.
 	 *
 	 * @since 0.1
-	 * @return array
+	 * @return Image|Video
 	 */
 	public function get_cover_media() {
 
-		$cover_media = new stdClass;
-		$cover_media->type = 'none';
+		$cover_media = Image::create();
+
 
 		// If someone else is handling this, let them. Otherwise fall back to us trying to use the featured image.
 		if ( has_filter( 'instant_articles_cover_media' ) ) {
@@ -488,16 +506,18 @@ class Instant_Articles_Post {
 			 * Filter the cover media.
 			 *
 			 * @since 0.1
-			 * @param stdClass  $cover_media  The cover media object.
+			 * @param Image     $cover_media  The cover media object.
 			 * @param int       $post_id      The current post ID.
 			 */
 			$cover_media = apply_filters( 'instant_articles_cover_media', $cover_media, $this->_post->ID );
 		} else {
+
 			$featured_image_data = $this->get_the_featured_image();
 			if ( isset( $featured_image_data['src'] ) && strlen( $featured_image_data['src'] ) ) {
-				$cover_media->type = 'image';
-				$cover_media->src = $featured_image_data['src'];
-				$cover_media->caption = $featured_image_data['caption'];
+				$cover_media = Image::create()->withURL($featured_image_data['src']);
+				if( isset( $featured_image_data['caption'] ) && strlen( $featured_image_data['caption'] )) {
+					$cover_media->withCaption(Caption::create()->withTitle($featured_image_data['caption']));
+				}
 			}
 		}
 
@@ -568,11 +588,11 @@ class Instant_Articles_Post {
 	public function to_instant_article() {
 
 		/**
-	     * Fires before the instant article is rendered.
-	     *
-	     * @since 0.1
-	     * @param Instant_Article_Post  $instant_article_post  The instant article post.
-	     */
+		 * Fires before the instant article is rendered.
+		 *
+		 * @since 0.1
+		 * @param Instant_Article_Post  $instant_article_post  The instant article post.
+		 */
 		do_action( 'instant_articles_before_transform_post', $this );
 
 		// Get time zone configured in WordPress. Default to UTC if no time zone configured.
@@ -591,9 +611,9 @@ class Instant_Articles_Post {
 		$settings_publishing = Instant_Articles_Option_Publishing::get_option_decoded();
 
 		if (
-			isset ( $settings_publishing['custom_rules_enabled'] ) &&
+			isset( $settings_publishing['custom_rules_enabled'] ) &&
 			! empty( $settings_publishing['custom_rules_enabled'] ) &&
-			isset ( $settings_publishing['custom_rules'] ) &&
+			isset( $settings_publishing['custom_rules'] ) &&
 			! empty( $settings_publishing['custom_rules'] )
 		) {
 			$transformer->loadRules( $settings_publishing['custom_rules'] );
@@ -616,9 +636,15 @@ class Instant_Articles_Post {
 		/*$title = $this->get_the_title();
 		if ( $title ) {
 			$document = new DOMDocument();
+			libxml_use_internal_errors(true);
 			$document->loadHTML( '<?xml encoding="' . $blog_charset . '" ?><h1>' . $title . '</h1>' );
+			libxml_use_internal_errors(false);
 			$transformer->transform( $header, $document );
 		}*/
+
+		if ( $this->has_subtitle() ) {
+			$header->withSubTitle ( $this->get_the_subtitle() ) ;
+		}
 
 		if ( $this->has_subtitle() ) {
 			$header->withSubTitle ( $this->get_the_subtitle() ) ;
@@ -642,17 +668,12 @@ class Instant_Articles_Post {
 		if ( $kicker ) {
 			$header->withKicker( $kicker );
 		}
-		$cover = $this->get_the_featured_image();
-		if ( $cover['src'] ) {
-			$image = Image::create()->withURL( $cover['src'] );
-			//$image->withPresentation ( Image::FULLSCREEN ) ;
-			if ( isset( $cover['caption'] ) && strlen( $cover['caption'] ) > 0 ) {
-				$document = DOMDocument::loadHTML( '<?xml encoding="' . $blog_charset . '" ?><h1>' . $cover['caption']  . '</h1>' );
-				$image->withCaption( $transformer->transform( Caption::create(), $document ) );
-			}
 
-			$header->withCover( $image );
+		$cover = $this->get_cover_media();
+		if ( $cover->getUrl() ) {
+			$header->withCover( $cover );
 		}
+
 		$this->instant_article =
 			InstantArticle::create()
 				->withCanonicalUrl( $this->get_canonical_url() )
@@ -661,33 +682,13 @@ class Instant_Articles_Post {
 				->addMetaProperty( 'op:generator:application:version', IA_PLUGIN_VERSION );
 
 		$settings_style = Instant_Articles_Option_Styles::get_option_decoded();
-		if ( isset( $settings_style['article_style'] ) && ! empty ( $settings_style['article_style'] ) ) {
+		if ( isset( $settings_style['article_style'] ) && ! empty( $settings_style['article_style'] ) ) {
 			$this->instant_article->withStyle( $settings_style['article_style'] );
-		}
-		else {
+		} else {
 			$this->instant_article->withStyle( 'default' );
 		}
 
-		$libxml_previous_state = libxml_use_internal_errors( true );
-		$document = new DOMDocument( '1.0', get_option( 'blog_charset' ) );
-		$content = $this->get_the_content();
-
-		// DOMDocument isn’t handling encodings too well, so let’s help it a little.
-		if ( function_exists( 'mb_convert_encoding' ) ) {
-			$content = mb_convert_encoding( $content, 'HTML-ENTITIES', get_option( 'blog_charset' ) );
-		} else {
-			$content = htmlspecialchars_decode( utf8_decode( htmlentities( $content, ENT_COMPAT, 'utf-8', false ) ) );
-		}
-
-		$result = $document->loadHTML( '<!doctype html><html><body>' . $content . '</body></html>' );
-		libxml_clear_errors();
-		libxml_use_internal_errors( $libxml_previous_state );
-
-		$document = apply_filters( 'instant_articles_parsed_document', $document );
-
-		if ( $result ) {
-			$transformer->transform( $this->instant_article, $document );
-		}
+		$transformer->transformString( $this->instant_article, $this->get_the_content(), get_option( 'blog_charset' ) );
 
 		$this->add_ads_from_settings();
 		$this->add_analytics_from_settings();

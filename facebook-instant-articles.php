@@ -4,7 +4,7 @@
  * Description: Add support for Instant Articles for Facebook to your WordPress site.
  * Author: Automattic, Dekode, Facebook
  * Author URI: https://vip.wordpress.com/plugins/instant-articles/
- * Version: 2.11
+ * Version: 3.2
  * Text Domain: instant-articles
  * License: GPLv2
  * License URI: http://www.gnu.org/licenses/gpl-2.0.html
@@ -15,16 +15,10 @@
 if ( version_compare( PHP_VERSION, '5.4', '<' ) ) {
 	add_action(
 		'admin_notices',
-		create_function(
-			'',
-			"echo '<div class=\"error\"><p>".
-				__(
-					'Instant Articles for WP requires PHP 5.4 to function properly. '.
-						'Please upgrade PHP or deactivate Instant Articles for WP.',
-					'instant-articles'
-				).
-				"</p></div>';"
-		)
+		function () {
+			echo '<div class="error"><p>' .
+				esc_html__( 'Instant Articles for WP requires PHP 5.4 to function properly. Please upgrade PHP or deactivate Instant Articles for WP.', 'instant-articles' ) . '</p></div>';
+		}
 	);
 	return;
 } else {
@@ -70,7 +64,7 @@ if ( version_compare( PHP_VERSION, '5.4', '<' ) ) {
 
 	defined( 'ABSPATH' ) || die( 'Shame on you' );
 
-	define( 'IA_PLUGIN_VERSION', '2.11' );
+	define( 'IA_PLUGIN_VERSION', '3.1' );
 	define( 'IA_PLUGIN_PATH_FULL', __FILE__ );
 	define( 'IA_PLUGIN_PATH', plugin_basename( __FILE__ ) );
 	define( 'IA_PLUGIN_FILE_BASENAME', pathinfo( __FILE__, PATHINFO_FILENAME ) );
@@ -83,7 +77,7 @@ if ( version_compare( PHP_VERSION, '5.4', '<' ) ) {
 
 	require_once( dirname( __FILE__ ) . '/embeds.php' );
 	require_once( dirname( __FILE__ ) . '/class-instant-articles-post.php' );
-	require_once( dirname( __FILE__ ) . '/settings/class-instant-articles-settings.php' );
+	require_once( dirname( __FILE__ ) . '/wizard/class-instant-articles-wizard.php' );
 	require_once( dirname( __FILE__ ) . '/meta-box/class-instant-articles-meta-box.php' );
 	require_once( dirname( __FILE__ ) . '/class-instant-articles-publisher.php' );
 
@@ -97,6 +91,21 @@ if ( version_compare( PHP_VERSION, '5.4', '<' ) ) {
 		flush_rewrite_rules();
 	}
 	register_activation_hook( __FILE__, 'instant_articles_activate' );
+
+	/**
+	 * Show a message to set up the plugin when it is activated
+	 */
+	add_action( 'admin_notices', 'instant_articles_setup_admin_notice' );
+	add_action( 'network_admin_notices', 'instant_articles_setup_admin_notice' ); // also show message on multisite
+	function instant_articles_setup_admin_notice() {
+		global $pagenow;
+		if ( $pagenow === 'plugins.php' && Instant_Articles_Wizard_State::get_current_state() !== Instant_Articles_Wizard_State::STATE_REVIEW_SUBMISSION ) {
+			$settings_url = Instant_Articles_Wizard::get_url();
+			echo '<div class="updated settings-error notice is-dismissible">';
+			echo '<p>Congrats, you\'ve installed the Instant Articles for WP plugin. Now <a href="' . esc_url_raw($settings_url) . '">set it up</a> to start publishing Instant Articles.';
+			echo '</div>';
+		}
+	}
 
 	/**
 	 * Plugin activation hook to remove our rewrite rules.
@@ -170,6 +179,18 @@ if ( version_compare( PHP_VERSION, '5.4', '<' ) ) {
 			$query->set( 'posts_per_rss', 10 );
 
 			/**
+			 * Filter the post types to include in the query.
+			 *
+			 * Default to `post` only, but allow other post types to be included by the theme/plugins.
+			 *
+			 * @since 2.12
+			 *
+			 * @param array $post_types Array of post types
+			 */
+			$post_types = apply_filters( 'instant_articles_post_types', array( 'post' ) );
+			$query->set( 'post_type', $post_types );
+
+			/**
 			 * If the constant INSTANT_ARTICLES_LIMIT_POSTS is set to true, we will limit the feed
 			 * to only include posts which are modified within the last 24 hours.
 			 * Facebook will initially need 100 posts to pass the review, but will only update
@@ -184,7 +205,6 @@ if ( version_compare( PHP_VERSION, '5.4', '<' ) ) {
 				) );
 			}
 		}
-
 	}
 	add_action( 'pre_get_posts', 'instant_articles_query', 10, 1 );
 
@@ -224,12 +244,12 @@ if ( version_compare( PHP_VERSION, '5.4', '<' ) ) {
 			plugins_url( '/css/instant-articles-meta-box.css', __FILE__ )
 		);
 		wp_register_style(
-			'instant-articles-settings-wizard',
-			plugins_url( '/css/instant-articles-settings-wizard.css', __FILE__ )
-		);
-		wp_register_style(
 			'instant-articles-settings',
 			plugins_url( '/css/instant-articles-settings.css', __FILE__ )
+		);
+		wp_register_style(
+			'instant-articles-wizard',
+			plugins_url( '/css/instant-articles-wizard.css', __FILE__ )
 		);
 
 		wp_register_script(
@@ -264,6 +284,13 @@ if ( version_compare( PHP_VERSION, '5.4', '<' ) ) {
 			null,
 			true
 		);
+		wp_register_script(
+			'instant-articles-wizard',
+			plugins_url( '/js/instant-articles-wizard.js', __FILE__ ),
+			null,
+			null,
+			true
+		);
 	}
 	add_action( 'init', 'instant_articles_register_scripts' );
 
@@ -276,12 +303,14 @@ if ( version_compare( PHP_VERSION, '5.4', '<' ) ) {
 		wp_enqueue_style( 'instant-articles-meta-box' );
 		wp_enqueue_style( 'instant-articles-settings-wizard' );
 		wp_enqueue_style( 'instant-articles-settings' );
+		wp_enqueue_style( 'instant-articles-wizard' );
 
 		wp_enqueue_script( 'instant-articles-meta-box' );
 		wp_enqueue_script( 'instant-articles-option-ads' );
 		wp_enqueue_script( 'instant-articles-option-analytics' );
 		wp_enqueue_script( 'instant-articles-option-publishing' );
 		wp_enqueue_script( 'instant-articles-settings' );
+		wp_enqueue_script( 'instant-articles-wizard' );
 	}
 	add_action( 'admin_enqueue_scripts', 'instant_articles_enqueue_scripts' );
 
@@ -303,12 +332,12 @@ if ( version_compare( PHP_VERSION, '5.4', '<' ) ) {
 	}
 	add_action( 'wp_head', 'inject_url_claiming_meta_tag' );
 
-	// Initialize the Instant Articles settings page.
-	Instant_Articles_Settings::init();
-
 	// Initialize the Instant Articles meta box.
 	Instant_Articles_Meta_Box::init();
 
 	// Initialize the Instant Articles publisher.
 	Instant_Articles_Publisher::init();
+
+	// Initialize the Instant Articles Wizard page.
+	Instant_Articles_Wizard::init();
 }

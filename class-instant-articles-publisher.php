@@ -18,6 +18,12 @@ use Facebook\Facebook;
 class Instant_Articles_Publisher {
 
 	/**
+	 * Key to store the submission status ID on meta data
+	 */
+	 const SUBMISSION_ID_KEY = 'instant_articles_submission_id';
+	 const FORCE_SUBMIT_KEY = 'instant_articles_force_submit';
+
+	/**
 	 * Inits publisher.
 	 */
 	public static function init() {
@@ -47,6 +53,12 @@ class Instant_Articles_Publisher {
                         return;
                 }
 
+		// Only process posts
+		$post_types = apply_filters( 'instant_articles_post_types', array( 'post' ) );
+		if ( ! in_array( $post->post_type, $post_types ) ) {
+			return;
+		}
+
 		// Transform the post to an Instant Article.
 		$adapter = new Instant_Articles_Post( $post );
 
@@ -56,7 +68,7 @@ class Instant_Articles_Publisher {
 		// This is important because the save_post action is also triggered by bulk updates, but in this case
 		// WordPress does not load the content field from DB for performance reasons. In this case, articles
 		// will be empty here, despite of them actually having content.
-		if ( count($article->getChildren()) === 0 || ! $article->getHeader() || ! $article->getHeader()->getTitle() ) {
+		if ( count( $article->getChildren() ) === 0 || ! $article->getHeader() || ! $article->getHeader()->getTitle() ) {
 			return;
 		}
 
@@ -65,6 +77,7 @@ class Instant_Articles_Publisher {
 			$fb_app_settings = Instant_Articles_Option_FB_App::get_option_decoded();
 			$fb_page_settings = Instant_Articles_Option_FB_Page::get_option_decoded();
 			$publishing_settings = Instant_Articles_Option_Publishing::get_option_decoded();
+			$force_submit = get_post_meta( $post_id, self::FORCE_SUBMIT_KEY, true );
 
 			$dev_mode = isset( $publishing_settings['dev_mode'] )
 				? ( $publishing_settings['dev_mode'] ? true : false )
@@ -83,19 +96,42 @@ class Instant_Articles_Publisher {
 					$dev_mode
 				);
 
+				// Don't publish posts with password protection
+				if ( post_password_required( $post ) ) {
+					// Unpublishes if already published and from now on it started to have password protection
+					$client->removeArticle( $article->getCanonicalURL() );
+					delete_post_meta( $post_id, self::SUBMISSION_ID_KEY );
+					return;
+				}
+
+				// Don't process if contains warnings and blocker flag for transformation warnings is turned on.
+				if ( count( $adapter->transformer->getWarnings() ) > 0
+				  && ( ! isset( $publishing_settings[ 'publish_with_warnings' ] ) || ! $publishing_settings[ 'publish_with_warnings' ] )
+					&& ( ! $force_submit )
+					) {
+
+					// Unpublishes if already published
+					$client->removeArticle( $article->getCanonicalURL() );
+					delete_post_meta( $post_id, self::SUBMISSION_ID_KEY );
+
+					return;
+				}
+
 				if ( $dev_mode ) {
-					$take_live = false;
+					$published = false;
 				} else {
 					// Any publish status other than 'publish' means draft for the Instant Article.
-					$take_live = true;
+					$published = true;
 				}
 
 				try {
 					// Import the article.
-					$client->importArticle( $article, $take_live );
+					$submission_id = $client->importArticle( $article, $published );
+					update_post_meta( $post_id, self::SUBMISSION_ID_KEY, $submission_id );
 				} catch ( Exception $e ) {
 					// Try without taking live for pages not yet reviewed.
-					$client->importArticle( $article, false );
+					$submission_id = $client->importArticle( $article, false );
+					update_post_meta( $post_id, self::SUBMISSION_ID_KEY, $submission_id );
 				}
 			}
 		} catch ( Exception $e ) {

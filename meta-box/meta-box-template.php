@@ -11,6 +11,13 @@ use Facebook\InstantArticles\Client\InstantArticleStatus;
 use Facebook\InstantArticles\Client\ServerMessage;
 ?>
 
+<?php if ( $dev_mode ) : ?>
+<a href="<?php echo esc_url( $settings_page_href ); ?>" class="instant-articles-dev-mode-indicator">
+	<span class="dashicons dashicons-admin-tools"></span>
+	Development Mode
+</a>
+<?php endif; ?>
+
 <?php if ( ! $published ) : ?>
 <p>
 	<b>
@@ -151,11 +158,11 @@ use Facebook\InstantArticles\Client\ServerMessage;
 					<?php echo esc_html( $warning ); ?>
 					<span>
 						<?php
-							if ( $warning->getNode() ) {
-								echo esc_html(
-									$warning->getNode()->ownerDocument->saveHTML( $warning->getNode() )
-								);
-							}
+						if ( $warning->getNode() ) {
+							echo esc_html(
+								$warning->getNode()->ownerDocument->saveHTML( $warning->getNode() )
+							);
+						}
 						?>
 					</span>
 				</div>
@@ -163,6 +170,13 @@ use Facebook\InstantArticles\Client\ServerMessage;
 			</li>
 		<?php endforeach; ?>
 	</ul>
+	<?php if ( ! $publish_with_warnings ) : ?>
+		<hr />
+		<p>
+			<input type="checkbox" id="instant_articles_force_submit" data-security="<?php echo $ajax_nonce; ?>" <?php checked( $force_submit , 1 ); ?> />
+			Submit this article even with warnings
+		</p>
+	<?php endif; ?>
 
 <?php else : ?>
 	<p>

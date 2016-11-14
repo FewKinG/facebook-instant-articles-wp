@@ -24,10 +24,13 @@ add_action( 'template_redirect', 'wpcom_fbia_stats_pixel' );
 function _wpcom_fbia_stats_pixel( $content ) {
 	global $post, $current_blog;
 
-	if( ! is_feed() )
+	if ( ! is_feed() ) {
 		return $content;
+	}
 
-	$url = 'https://pixel.wp.com/b.gif?host=' . $_SERVER[ 'HTTP_HOST' ] . '&blog=' . $current_blog->blog_id . '&post=' . $post->ID . '&subd=' . str_replace( '.wordpress.com', '', $current_blog->domain ) . '&ref=&feed=1';
+	$hostname = isset( $_SERVER['HTTP_HOST'] ) ? sanitize_text_field( wp_unslash( $_SERVER['HTTP_HOST'] ) ) : ''; // input var okay
+
+	$url = 'https://pixel.wp.com/b.gif?host=' . $hostname . '&blog=' . $current_blog->blog_id . '&post=' . $post->ID . '&subd=' . str_replace( '.wordpress.com', '', $current_blog->domain ) . '&ref=&feed=1';
 
 	$fbia_pixel = '
 <figure class="op-tracker">
@@ -41,3 +44,7 @@ function _wpcom_fbia_stats_pixel( $content ) {
 	return $content . $fbia_pixel;
 
 }
+
+// make sure these function run in wp.com environment where `plugins_loaded` is already fired when loading the plugin
+add_action( 'after_setup_theme', 'instant_articles_load_textdomain' );
+add_action( 'after_setup_theme', 'instant_articles_load_compat' );

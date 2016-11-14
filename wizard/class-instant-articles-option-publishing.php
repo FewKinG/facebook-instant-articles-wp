@@ -43,10 +43,17 @@ class Instant_Articles_Option_Publishing extends Instant_Articles_Option {
 			'label' => '',
 			'render' => 'textarea',
 			'placeholder' => '{ "rules": [{ "class": "BoldRule", "selector": "span.bold" }, ... ] }',
-			'description' => 'Read more about <a href="https://github.com/facebook/facebook-instant-articles-sdk-php/blob/master/docs/QuickStart.md#custom-transformer-rules" target="_blank">defining your own custom rules</a> to extend/override the <a href="https://github.com/Automattic/facebook-instant-articles-wp/blob/master/rules-configuration.json" target="_blank">built-in ruleset</a>. If you\'ve defined a common rule which you think this plugin should include by default, <a href="https://github.com/Automattic/facebook-instant-articles-wp/issues/new" target="_blank">tell us about it</a>!',
-			'default' => ''
+			'description' => 'Read more about <a href="https://developers.facebook.com/docs/instant-articles/sdk/transformer-rules" target="_blank">defining your own custom rules</a> to extend/override the <a href="https://github.com/Automattic/facebook-instant-articles-wp/blob/master/rules-configuration.json" target="_blank">built-in ruleset</a>. If you\'ve defined a common rule which you think this plugin should include by default, <a href="https://github.com/Automattic/facebook-instant-articles-wp/issues/new" target="_blank">tell us about it</a>!',
+			'default' => '',
 		),
 
+		'publish_with_warnings' => array(
+			'label' => 'Transformation warnings',
+			'description' => 'With this option disabled, articles which contain warnings in their transformation process won\'t be available as Instant Articles by default — this can be overridden on individual articles. Note: It is recommended that all transformation warnings be fixed.',
+			'render' => 'checkbox',
+			'default' => false,
+			'checkbox_label' => 'Publish articles containing warnings',
+		),
 	);
 
 	/**
@@ -62,7 +69,7 @@ class Instant_Articles_Option_Publishing extends Instant_Articles_Option {
 		);
 		wp_localize_script( 'instant-articles-option-publishing', 'INSTANT_ARTICLES_OPTION_PUBLISHING', array(
 			'option_field_id_custom_rules_enabled' => self::OPTION_KEY . '-custom_rules_enabled',
-			'option_field_id_custom_rules'         => self::OPTION_KEY . '-custom_rules'
+			'option_field_id_custom_rules'         => self::OPTION_KEY . '-custom_rules',
 		) );
 	}
 
@@ -92,7 +99,7 @@ class Instant_Articles_Option_Publishing extends Instant_Articles_Option {
 				case 'custom_rules':
 					if ( isset( $field_values['custom_rules_enabled'] ) && $field_values['custom_rules_enabled'] ) {
 						$custom_rules_json = json_decode( $field_values['custom_rules'] );
-						if ( $custom_rules_json === null ) {
+						if ( null === $custom_rules_json ) {
 							$field_values['custom_rules'] = $field['default'];
 							add_settings_error(
 								'custom_embed',

@@ -138,9 +138,6 @@
             }
         }
     }, {
-        "class": "IgnoreRule",
-        "selector" : "script"
-    }, {
         "class": "InteractiveRule",
         "selector" : "iframe",
         "properties" : {
@@ -268,6 +265,24 @@
                 "type" : "int",
                 "selector" : "iframe",
                 "attribute": "width"
+            }
+        }
+    }, {
+        "class": "InteractiveRule",
+        "selector" : "div.fb-post",
+        "properties" : {
+            "interactive.iframe" : {
+                "type": "multiple",
+                "children": [
+                    {
+                        "type": "fragment",
+                        "fragment": "<p>Extra markup</p>"
+                    },
+                    {
+                        "type" : "element",
+                        "selector" : "div.fb-post"
+                    }
+                ]
             }
         }
     }, {
@@ -418,8 +433,8 @@
         "class": "CaptionRule",
         "selector" : "figcaption"
     }, {
-        "class": "CaptionRule",
-        "selector" : "p.wp-caption-text"
+      "class": "CaptionRule",
+      "selector" : "p.wp-caption-text"
     }, {
         "class": "ImageRule",
         "selector" : "figure",
@@ -446,27 +461,144 @@
                 "attribute": "type"
             }
         }
-    }, {
-        "class" : "PassThroughRule",
-        "selector" : "div.vce-gallery-big"
-    }, {
-        "class" : "PassThroughRule",
-        "selector" : "div.vce-gallery-small"
-    }, {
-        "class" : "IgnoreRule",
-        "selector" : "div.vce-gallery-slider"
-    }, {
-        "class": "SlideshowImageRule",
-        "selector" : "div.big-gallery-item",
-        "properties" : {
-            "image.url" : {
-                "type" : "string",
-                "selector" : "img",
+    },
+
+
+
+    {
+      "class" : "IgnoreRule",
+      "selector" : "p.jetpack-slideshow-noscript"
+    },
+    {
+      "class": "CaptionRule",
+      "selector" : "div.wp-caption-text"
+    },
+    {
+      "class" : "PassThroughRule",
+      "selector" : "div.gallery-row"
+    },
+    {
+      "class" : "PassThroughRule",
+      "selector" : "div.tiled-gallery p"
+    },
+    {
+      "class" : "PassThroughRule",
+      "selector" : "div.gallery-row p"
+    },
+    {
+      "class" : "PassThroughRule",
+      "selector" : "div.gallery-group p"
+    },
+    {
+      "class" : "PassThroughRule",
+      "selector" : "div.gallery-group"
+    },
+    {
+      "class": "ImageRule",
+      "selector" : "div.wp-caption",
+      "properties" : {
+          "image.url" : {
+              "type" : "string",
+              "selector" : "img",
+              "attribute": "src"
+          }
+      }
+    },
+    {
+      "class": "SlideshowImageRule",
+      "selector" : "div.tiled-gallery-item",
+      "properties" : {
+        "image.url" : {
+          "type" : "string",
+          "selector" : "img",
+          "attribute": "data-orig-file"
+        },
+        "caption.title" : {
+          "type" : "string",
+          "selector" : "div.tiled-gallery-caption"
+        }
+      }
+    },
+    {
+      "class": "SlideshowRule",
+      "selector" : "div.tiled-gallery"
+    },
+    {
+      "class": "SlideshowRule",
+      "selector" : "div.tiled-gallery"
+    },
+    {
+      "class": "Compat\\JetpackSlideshowRule",
+      "selector" : "div.jetpack-slideshow",
+      "properties": {
+        "jetpack.data-gallery": {
+          "type": "json",
+          "selector": "div.jetpack-slideshow",
+          "attribute": "data-gallery"
+        }
+      }
+    },
+    {
+      "class": "CaptionRule",
+      "selector" : "div.tiled-gallery-caption"
+    },
+    {
+      "class" : "PassThroughRule",
+      "selector" : "div.vce-gallery-big"
+    },
+    {
+      "class" : "PassThroughRule",
+      "selector" : "div.vce-gallery-small"
+    },
+    {
+      "class" : "IgnoreRule",
+      "selector" : "div.vce-gallery-slider"
+    },
+    {
+      "class": "SlideshowImageRule",
+      "selector" : "div.big-gallery-item",
+      "properties" : {
+        "image.url" : {
+          "type" : "string",
+          "selector" : "img",
+          "attribute": "src"
+        },
+        "caption.title" : {
+          "type" : "string",
+          "selector" : "figcaption.wp-caption-text"
+        }
+      }
+    },
+
+
+    {
+        "class": "ImageInsideParagraphRule",
+        "selector": "figure.wp-caption",
+        "properties": {
+            "image.url": {
+                "type": "string",
+                "selector": "img",
                 "attribute": "src"
-            },
-            "caption.title" : {
-                "type" : "string",
-                "selector" : "figcaption.wp-caption-text"
+            }
+        }
+    },
+
+    {
+        "class": "InteractiveRule",
+        "selector" : "iframe.sibling",
+        "properties" : {
+            "interactive.iframe" : {
+                "type" : "multiple",
+                "children": [
+                    {
+                        "type": "children",
+                        "selector": "iframe"
+                    }, {
+                        "type": "next-sibling-element-of",
+                        "selector": "iframe",
+                        "sibling.selector": "script"
+                    }
+                ]
             }
         }
     }

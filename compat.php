@@ -34,3 +34,17 @@ if ( defined( 'JETPACK__VERSION' ) ) {
 	$jp = new Instant_Articles_Jetpack;
 	$jp->init();
 }
+
+// Load support for Get The Image plugin
+if ( function_exists( 'get_the_image' ) ) {
+	include( dirname( __FILE__ ) . '/compat/class-instant-articles-get-the-image.php' );
+	$gti = new Instant_Articles_Get_The_Image;
+	$gti->init();
+}
+
+// Load support for Playbuzz plugin
+if ( function_exists( 'playbuzz_settings_link' ) ) {
+	include( dirname( __FILE__ ) . '/compat/class-instant-articles-playbuzz.php' );
+	$playbuzz = new Instant_Articles_Playbuzz;
+	$playbuzz->init();
+}
