@@ -48,11 +48,6 @@ class Instant_Articles_Publisher {
 			return;
 		}
 
-		$publish = apply_filters( 'instant_article_publish_post', $post );
-                if ( $publish === false ) {
-                        return;
-                }
-
 		// Only process posts
 		$post_types = apply_filters( 'instant_articles_post_types', array( 'post' ) );
 		if ( ! in_array( $post->post_type, $post_types ) ) {
@@ -63,7 +58,7 @@ class Instant_Articles_Publisher {
 		$adapter = new Instant_Articles_Post( $post );
 
 		$article = $adapter->to_instant_article();
-
+						
 		// Skip empty articles or articles missing title.
 		// This is important because the save_post action is also triggered by bulk updates, but in this case
 		// WordPress does not load the content field from DB for performance reasons. In this case, articles
@@ -95,6 +90,13 @@ class Instant_Articles_Publisher {
 					$fb_page_settings['page_id'],
 					$dev_mode
 				);
+
+				$publish = apply_filters( 'instant_article_publish_post', true, $post_id, $post );
+				if ( ! $publish ) {
+					$client->removeArticle( $article->getCanonicalURL() );
+					delete_post_meta( $post_id, self::SUBMISSION_ID_KEY );
+					return ;
+				}
 
 				// Don't publish posts with password protection
 				if ( post_password_required( $post ) ) {
@@ -135,6 +137,7 @@ class Instant_Articles_Publisher {
 				}
 			}
 		} catch ( Exception $e ) {
+			error_log ( 'IA SUBMIT ERROR: ' . $e ) ;
 			Logger::getLogger( 'instantarticles-wp-plugin' )->error(
 				'Unable to submit article.',
 				$e->getTraceAsString()
